@@ -1,4 +1,5 @@
 import json
+from os import getenv
 import time
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +10,7 @@ from pydantic_ai.providers.google import GoogleProvider
 from router_agent import RouterAgent
 from rag_generator import RAGGenerator
 from llm_judge import LLMJudge
+from dotenv import load_dotenv
 
 
 class RAGSystem:
@@ -26,7 +28,7 @@ class RAGSystem:
             self,
             api_key: str,
             collection_name: str = "pdf_documents",
-            model_name: str = "gemini-3-flash-preview",
+            model_name: str = "gemini-2.5-flash-lite",
             results_dir: str = str(Path(__file__).resolve().parent / "results")
     ):
         """
@@ -321,9 +323,10 @@ def main():
     """
 
     # Configuration
-    API_KEY = 'AIzaSyB2AHqVzfNEZ3iBAQ8SmDECpxBS54BhfA0'
+    load_dotenv()
+    API_KEY = getenv("GEMINI_API_KEY")
     COLLECTION_NAME = "pdf_documents"
-    MODEL_NAME = "gemini-3-flash-preview"
+    MODEL_NAME = "gemini-2.5-flash-lite"
 
     # Initialize system
     rag_system = RAGSystem(
