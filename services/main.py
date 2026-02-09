@@ -26,8 +26,8 @@ class RAGSystem:
             self,
             api_key: str,
             collection_name: str = "pdf_documents",
-            model_name: str = "gemini-2.5-flash-lite",
-            results_dir: str = "results"
+            model_name: str = "gemini-3-flash-preview",
+            results_dir: str = str(Path(__file__).resolve().parent / "results")
     ):
         """
         Initialize RAG System.
@@ -63,7 +63,7 @@ class RAGSystem:
 
         # Results tracking
         self.results_dir = Path(results_dir)
-        self.results_dir.mkdir(exist_ok=True)
+        self.results_dir.mkdir(parents=True, exist_ok=True)
         self.results_log = []
 
         print("\n" + "RAG SYSTEM IS READY ✓")
@@ -87,9 +87,8 @@ class RAGSystem:
         Returns:
             dict with complete result information
         """
-        print("\n" + "=" * 80)
-        print("PROCESSING QUERY")
-        print("=" * 80)
+        print("\n" + "PROCESSING QUERY")
+        print("—" * 80)
         print(f"Query: {query}")
 
         start_time = time.time()
@@ -148,7 +147,7 @@ class RAGSystem:
             self.results_log.append(result)
 
         print(f"\n[COMPLETE] Processed in {elapsed_time:.2f} seconds")
-        print("=" * 80 + "\n")
+        print("—" * 80 + "\n")
 
         return result
 
@@ -167,17 +166,16 @@ class RAGSystem:
         Returns:
             dict with statistics
         """
-        print("\n" + "=" * 80)
-        print("BATCH PROCESSING")
-        print("=" * 80)
+        print("\n" + "BATCH PROCESSING")
+        print("—" * 80)
         print(f"Total queries: {len(queries)}\n")
 
         results = []
 
         for i, item in enumerate(queries, 1):
-            print(f"\n{'=' * 80}")
+            print(f"\n{'—' * 80}")
             print(f"Query {i}/{len(queries)}")
-            print(f"{'=' * 80}")
+            print(f"{'—' * 80}")
 
             query = item['query']
             true_response = item.get('true_response')
@@ -235,8 +233,7 @@ class RAGSystem:
             }
         }
 
-        print("\n" + "=" * 80)
-        print("STATISTICS")
+        print("\n" + "STATISTICS")
         print("=" * 80)
         print(json.dumps(stats, indent=2))
 
@@ -276,14 +273,14 @@ class RAGSystem:
         """
         Interactive mode for testing the system.
         """
-        print("\n" + "=" * 80)
-        print("INTERACTIVE MODE")
-        print("=" * 80)
+
+        print("\n" +"INTERACTIVE MODE")
+        print("—" * 80)
         print("Commands:")
         print("  - Type your query to get an answer")
         print("  - Type 'stats' to see current statistics")
         print("  - Type 'quit' or 'exit' to quit")
-        print("=" * 80 + "\n")
+        print("—" * 80 + "\n")
 
         while True:
             try:
@@ -306,11 +303,10 @@ class RAGSystem:
                 # Process query
                 result = self.process_query(query, save_result=True)
 
-                print(f"\n{'=' * 80}")
-                print("ANSWER")
-                print(f"{'=' * 80}")
+                print( "\n" + "ANSWER")
+                print(f"{'—' * 80}")
                 print(result['response'])
-                print(f"{'=' * 80}")
+                print(f"{'—' * 80}")
 
             except KeyboardInterrupt:
                 print("\n\nExiting...")
@@ -327,7 +323,7 @@ def main():
     # Configuration
     API_KEY = 'AIzaSyB2AHqVzfNEZ3iBAQ8SmDECpxBS54BhfA0'
     COLLECTION_NAME = "pdf_documents"
-    MODEL_NAME = "gemini-2.5-flash-lite"
+    MODEL_NAME = "gemini-3-flash-preview"
 
     # Initialize system
     rag_system = RAGSystem(
@@ -360,10 +356,18 @@ def main():
     print("2. Interactive mode")
     print("3. Single query test")
     print("4. Exit")
+    print("Type 'stats' at any prompt to see current statistics.")
 
     while True:
         try:
             choice = input("\nEnter choice (1-4): ").strip()
+
+            if choice.lower() == "stats":
+                if rag_system.results_log:
+                    rag_system.calculate_statistics(rag_system.results_log)
+                else:
+                    print("No results yet!")
+                continue
 
             if choice == "1":
                 rag_system.batch_process(test_queries)
@@ -373,21 +377,30 @@ def main():
 
             elif choice == "3":
                 query = input("\nEnter query: ").strip()
+                if query.lower() == "stats":
+                    if rag_system.results_log:
+                        rag_system.calculate_statistics(rag_system.results_log)
+                    else:
+                        print("No results yet!")
+                    continue
                 true_resp = input("Enter true response (or press Enter to skip): ").strip()
                 true_resp = true_resp if true_resp else None
 
                 result = rag_system.process_query(query, true_resp)
 
-                print(f"\n{'=' * 80}")
-                print("RESULT")
-                print(f"{'=' * 80}")
+                print("\n" + "RESULT")
+                print(f"{'—' * 80}")
                 print(f"Response: {result['response']}")
                 if result['judgment']:
                     print(f"Judgment: {result['judgment']['judgment']}")
-                print(f"{'=' * 80}")
+                print(f"{'—' * 80}")
 
             elif choice == "4":
                 print("\nExiting...")
+                if rag_system.results_log:
+                    stats = rag_system.calculate_statistics(rag_system.results_log)
+                    rag_system.save_statistics(stats)
+                    rag_system.save_detailed_results(rag_system.results_log)
                 break
 
             else:
