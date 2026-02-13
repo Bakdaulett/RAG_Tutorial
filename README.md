@@ -11,8 +11,6 @@ A complete **Retrieval-Augmented Generation (RAG)** system implementation with i
 - [Quick Start](#quick-start)
 - [Usage](#usage)
 - [Results & Accuracy Reporting](#results--accuracy-reporting)
-- [Statistics](#statistics)
-- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -316,130 +314,6 @@ Right answer: 29/47, accuracy: 62%
 
 ---
 
-## Statistics
-
-### Accuracy Metrics
-
-The system calculates accuracy based on **LLM-as-judge** evaluations:
-
-```
-Accuracy = (Correct Judgments / Total Judged) × 100%
-```
-
-**Example**:
-- Total questions: 60
-- Judged: 60 (all had ground-truth answers)
-- Correct: 51
-- **Accuracy: 85%**
-
-### Routing Statistics
-
-Tracks how often RAG vs Direct routing was used:
-
-- **RAG Percentage**: `(RAG decisions / Total queries) × 100%`
-- **Direct Percentage**: `(Direct decisions / Total queries) × 100%`
-
-**Example**:
-- Total queries: 60
-- RAG decisions: 45
-- Direct decisions: 15
-- **RAG Percentage: 75%**
-
-### Performance Metrics
-
-- **Average Processing Time**: Mean time per query (seconds)
-- **Average Contexts Retrieved**: Mean number of document chunks used per RAG query
-
-### Sample Statistics Output
-
-```json
-{
-  "timestamp": "2026-02-13T18:30:00",
-  "total_queries": 60,
-  "routing": {
-    "rag": 45,
-    "direct": 15,
-    "rag_percentage": 75.0
-  },
-  "judgment": {
-    "total_judged": 60,
-    "correct": 51,
-    "incorrect": 9,
-    "accuracy": 85.0
-  },
-  "performance": {
-    "avg_time_seconds": 3.2,
-    "avg_contexts_retrieved": 4.8
-  }
-}
-```
-
----
-
-## Troubleshooting
-
-### Ollama Model Not Found
-
-**Error**: `Model 'nomic-embed-text' not found`
-
-**Solution**:
-```bash
-ollama pull nomic-embed-text
-ollama pull llama3.1:8b-instruct-q4_0
-```
-
-### Qdrant Connection Error
-
-**Error**: `Connection refused` or `Could not connect to Qdrant`
-
-**Solution**:
-1. Ensure Qdrant is running:
-   ```bash
-   docker ps | grep qdrant
-   ```
-2. Start Qdrant if not running:
-   ```bash
-   docker run -p 6333:6333 -v qdrant_data:/qdrant/storage qdrant/qdrant
-   ```
-
-### Gemini API Quota Exceeded
-
-**Error**: `429 Quota exceeded` or `RESOURCE_EXHAUSTED`
-
-**Solutions**:
-1. **Use Ollama evaluation** (`evaluate_ollama.py`) – no quota limits
-2. **Add more API keys** to `.env` for rotation
-3. **Wait for quota reset** (usually daily)
-4. **Use checkpoint resume** – script will continue from last question
-
-### API Key Expired
-
-**Error**: `API key expired` or `API_KEY_INVALID`
-
-**Solution**:
-1. Generate new API key from [Google AI Studio](https://aistudio.google.com/)
-2. Update `.env` file with new key
-3. Restart the script
-
-### Excel File Not Found
-
-**Error**: `Excel file not found: RAG Documents.xlsx`
-
-**Solution**:
-1. Ensure `RAG Documents.xlsx` is in project root directory
-2. Check that columns C (questions) and D (answers) contain data
-3. Verify file is not open in Excel
-
-### Checkpoint Resume Issues
-
-**Problem**: Script starts from beginning instead of resuming
-
-**Solution**:
-1. Check `services/results/gemini_eval_checkpoint.json` exists
-2. Verify it contains valid `last_index` and `results`
-3. Delete checkpoint file if you want to start fresh
-
----
 
 ## Project Structure
 
@@ -467,14 +341,6 @@ RAG_Tutorial/
 └── README.md                   # This file
 ```
 
----
-
-## License
-
-This project is intended for educational and research purposes.
-
----
-
 ## Acknowledgments
 
 - **Qdrant** – Vector database for semantic search
@@ -484,6 +350,3 @@ This project is intended for educational and research purposes.
 
 ---
 
-## Contact & Support
-
-For issues or questions, please open an issue in the repository.
