@@ -1,5 +1,6 @@
 import json
-from os import getenv
+import csv
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -27,8 +28,8 @@ class RAGSystem:
     def __init__(
             self,
             api_key: str,
-            collection_name: str = "pdf_documents",
-            model_name: str = "gemini-2.5-flash-lite",
+            collection_name: str,
+            model_name: str,
             results_dir: str = str(Path(__file__).resolve().parent / "results")
     ):
         """
@@ -242,34 +243,74 @@ class RAGSystem:
         return stats
 
     def save_statistics(self, stats: dict):
-        """Save statistics to file."""
-        stats_file = self.results_dir / f"stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(stats_file, 'w') as f:
-            json.dump(stats, f, indent=2)
-        print(f"\nStatistics saved to: {stats_file}")
+        """Save statistics to CSV file."""
+        stats_file = self.results_dir / f"stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+        # Flatten nested statistics structure for CSV
+        flat_stats = {
+            "timestamp": stats.get("timestamp"),
+            "total_queries": stats.get("total_queries"),
+            "routing_rag": stats.get("routing", {}).get("rag"),
+            "routing_direct": stats.get("routing", {}).get("direct"),
+            "routing_rag_percentage": stats.get("routing", {}).get("rag_percentage"),
+            "judgment_total_judged": stats.get("judgment", {}).get("total_judged"),
+            "judgment_correct": stats.get("judgment", {}).get("correct"),
+            "judgment_incorrect": stats.get("judgment", {}).get("incorrect"),
+            "judgment_accuracy": stats.get("judgment", {}).get("accuracy"),
+            "performance_avg_time_seconds": stats.get("performance", {}).get("avg_time_seconds"),
+            "performance_avg_contexts_retrieved": stats.get("performance", {}).get("avg_contexts_retrieved"),
+        }
+
+        fieldnames = list(flat_stats.keys())
+
+        with open(stats_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow(flat_stats)
+
+        print(f"\nStatistics saved to (CSV): {stats_file}")
 
     def save_detailed_results(self, results: list[dict]):
-        """Save detailed results to file."""
-        results_file = self.results_dir / f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        """Save detailed results to CSV file."""
+        results_file = self.results_dir / f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
-        # Convert to serializable format
-        serializable_results = []
-        for r in results:
-            serializable_results.append({
-                "timestamp": r["timestamp"],
-                "query": r["query"],
-                "routing_decision": r["routing"]["decision"],
-                "routing_reasoning": r["routing"]["reasoning"],
-                "response": r["response"],
-                "num_contexts": r["num_contexts"],
-                "true_response": r["true_response"],
-                "judgment": r["judgment"],
-                "elapsed_time": r["elapsed_time"]
-            })
+        # Define CSV columns
+        fieldnames = [
+            "timestamp",
+            "query",
+            "routing_decision",
+            "routing_reasoning",
+            "response",
+            "num_contexts",
+            "true_response",
+            "judgment_judgment",
+            "judgment_confidence",
+            "judgment_explanation",
+            "elapsed_time",
+        ]
 
-        with open(results_file, 'w') as f:
-            json.dump(serializable_results, f, indent=2)
-        print(f"Detailed results saved to: {results_file}")
+        with open(results_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for r in results:
+                judgment = r.get("judgment") or {}
+                row = {
+                    "timestamp": r.get("timestamp"),
+                    "query": r.get("query"),
+                    "routing_decision": r.get("routing", {}).get("decision"),
+                    "routing_reasoning": r.get("routing", {}).get("reasoning"),
+                    "response": r.get("response"),
+                    "num_contexts": r.get("num_contexts"),
+                    "true_response": r.get("true_response"),
+                    "judgment_judgment": judgment.get("judgment"),
+                    "judgment_confidence": judgment.get("confidence"),
+                    "judgment_explanation": judgment.get("explanation"),
+                    "elapsed_time": r.get("elapsed_time"),
+                }
+                writer.writerow(row)
+
+        print(f"Detailed results saved to (CSV): {results_file}")
 
     def interactive_mode(self):
         """
@@ -324,9 +365,9 @@ def main():
 
     # Configuration
     load_dotenv()
-    API_KEY = getenv("GEMINI_API_KEY")
-    COLLECTION_NAME = "pdf_documents"
-    MODEL_NAME = "gemini-2.5-flash-lite"
+    API_KEY = os.getenv("GEMINI_API_KEY")
+    COLLECTION_NAME = os.getenv("PDF_DOCUMENTS")
+    MODEL_NAME = os.getenv("GEMINI_MODEL_NAME")
 
     # Initialize system
     rag_system = RAGSystem(
