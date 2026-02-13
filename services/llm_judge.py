@@ -1,22 +1,21 @@
 import json
-from pydantic_ai import Agent
+import ollama
 
 
 class LLMJudge:
     """
     LLM Judge that performs semantic comparison between generated response and true response.
-    Uses Gemini to evaluate if the responses are semantically equivalent.
+    Uses a local Ollama model (e.g. llama2) to evaluate if the responses are semantically equivalent.
     """
 
-    def __init__(self, model):
+    def __init__(self, model_name: str = "llama3.1:8b-instruct-q4_0"):
         """
         Initialize LLM Judge.
 
         Args:
-            model: Gemini model instance from pydantic_ai GoogleModel
+            model_name: Name of the Ollama model to use for judging.
         """
-        self.model = model
-        self.agent = Agent(model=model)
+        self.model_name = model_name
 
     def evaluate(self, llm_response: str, true_response: str, query: str = None) -> dict:
         """
@@ -60,16 +59,19 @@ Respond in JSON format:
 Only output valid JSON, nothing else."""
 
         try:
-            response = self.agent.run_sync(prompt)
+            # Call local Ollama model as judge
+            response = ollama.chat(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+            )
 
-            # Parse JSON from response (pydantic-ai returns result as string directly)
-            response_text = str(response.output).strip() if hasattr(response, 'output') else str(response).strip()
+            response_text = response.get("message", {}).get("content", "").strip()
 
             # Extract JSON if wrapped in markdown
             if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
+                response_text = response_text.split("```json", 1)[1].split("```", 1)[0].strip()
             elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0].strip()
+                response_text = response_text.split("```", 1)[1].split("```", 1)[0].strip()
 
             result = json.loads(response_text)
 

@@ -60,9 +60,9 @@ class RAGSystem:
             collection_name=collection_name
         )
 
-        # Initialize LLM Judge
-        print("\n[4/4] Setting up LLM Judge...")
-        self.judge = LLMJudge(self.model)
+        # Initialize LLM Judge (Ollama-based, separate from Gemini)
+        print("\n[4/4] Setting up LLM Judge (Ollama)...")
+        self.judge = LLMJudge()
 
         # Results tracking
         self.results_dir = Path(results_dir)
@@ -312,149 +312,122 @@ class RAGSystem:
 
         print(f"Detailed results saved to (CSV): {results_file}")
 
-    def interactive_mode(self):
+    def save_text_accuracy_summary(self, stats: dict):
         """
-        Interactive mode for testing the system.
+        Save a simple text summary like:
+        "Right answer: 51/60, accuracy: 85%"
+
+        Only counted over results that have a judgment.
         """
+        judged = stats.get("judgment", {})
+        total_judged = judged.get("total_judged", 0)
+        correct = judged.get("correct", 0)
+        accuracy = judged.get("accuracy", 0.0)
 
-        print("\n" +"INTERACTIVE MODE")
-        print("—" * 80)
-        print("Commands:")
-        print("  - Type your query to get an answer")
-        print("  - Type 'stats' to see current statistics")
-        print("  - Type 'quit' or 'exit' to quit")
-        print("—" * 80 + "\n")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        summary_file = self.results_dir / f"evaluation_summary_{timestamp}.txt"
 
-        while True:
-            try:
-                query = input("\nQuery: ").strip()
+        with open(summary_file, "w", encoding="utf-8") as f:
+            f.write(f"Right answer: {correct}/{total_judged}, accuracy: {accuracy:.0f}%")
 
-                if query.lower() in ['quit', 'exit', 'q']:
-                    print("Exiting...")
-                    break
-
-                if query.lower() == 'stats':
-                    if self.results_log:
-                        stats = self.calculate_statistics(self.results_log)
-                    else:
-                        print("No results yet!")
-                    continue
-
-                if not query:
-                    continue
-
-                # Process query
-                result = self.process_query(query, save_result=True)
-
-                print( "\n" + "ANSWER")
-                print(f"{'—' * 80}")
-                print(result['response'])
-                print(f"{'—' * 80}")
-
-            except KeyboardInterrupt:
-                print("\n\nExiting...")
-                break
-            except Exception as e:
-                print(f"Error: {e}")
-
+        print(f"Simple text summary saved to: {summary_file}")
 
 def main():
     """
-    Main function demonstrating the RAG system.
+    Main entry point: simple chat loop.
+    - Uses RouterAgent (Gemini) to decide RAG vs direct
+    - Answers with RAGGenerator accordingly
+    - Tracks basic statistics and saves them on exit
     """
 
-    # Configuration
+    # Load configuration
     load_dotenv()
-    API_KEY = os.getenv("GEMINI_API_KEY")
-    COLLECTION_NAME = os.getenv("PDF_DOCUMENTS")
-    MODEL_NAME = os.getenv("GEMINI_MODEL_NAME")
+    api_key = os.getenv("GEMINI_API_KEY")
+    collection_name = os.getenv("PDF_DOCUMENTS")
+    model_name = os.getenv("GEMINI_MODEL_NAME")
+
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set in the environment or .env file.")
+
+    if not collection_name:
+        collection_name = "pdf_documents"
+
+    if not model_name:
+        model_name = "gemini-2.5-flash-lite"
 
     # Initialize system
     rag_system = RAGSystem(
-        api_key=API_KEY,
-        collection_name=COLLECTION_NAME,
-        model_name=MODEL_NAME
+        api_key=api_key,
+        collection_name=collection_name,
+        model_name=model_name,
     )
 
-    # Example queries for testing
-    test_queries = [
-        {
-            "query": "What is machine learning?",
-            "true_response": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed."
-        },
-        {
-            "query": "Hello, how are you?",
-            "true_response": "I'm doing well, thank you for asking!"
-        },
-        {
-            "query": "Explain neural networks",
-            "true_response": "Neural networks are computing systems inspired by biological neural networks. They consist of interconnected nodes (neurons) organized in layers that process information."
-        }
-    ]
-
-    # Menu
-    print("RAG SYSTEM MENU")
+    print("RAG CHAT")
     print("—" * 80)
-    print("\nOptions:")
-    print("1. Process test queries")
-    print("2. Interactive mode")
-    print("3. Single query test")
-    print("4. Exit")
-    print("Type 'stats' at any prompt to see current statistics.")
+    print("Type your question and press Enter.")
+    print("Type 'stats' to see current statistics.")
+    print("Type 'quit' or 'exit' to end the chat.")
+    print("—" * 80)
 
-    while True:
-        try:
-            choice = input("\nEnter choice (1-4): ").strip()
+    try:
+        while True:
+            query = input("\nYou: ").strip()
 
-            if choice.lower() == "stats":
+            if not query:
+                continue
+
+            lower_q = query.lower()
+            if lower_q in {"quit", "exit", "q"}:
+                print("Exiting chat...")
+                break
+
+            if lower_q == "stats":
                 if rag_system.results_log:
                     rag_system.calculate_statistics(rag_system.results_log)
                 else:
-                    print("No results yet!")
+                    print("No queries yet, nothing to show.")
                 continue
 
-            if choice == "1":
-                rag_system.batch_process(test_queries)
+            # Process query through router + RAG/direct (no ground truth yet)
+            result = rag_system.process_query(query, save_result=True)
 
-            elif choice == "2":
-                rag_system.interactive_mode()
+            print("Assistant:")
+            print(result["response"])
 
-            elif choice == "3":
-                query = input("\nEnter query: ").strip()
-                if query.lower() == "stats":
-                    if rag_system.results_log:
-                        rag_system.calculate_statistics(rag_system.results_log)
-                    else:
-                        print("No results yet!")
-                    continue
-                true_resp = input("Enter true response (or press Enter to skip): ").strip()
-                true_resp = true_resp if true_resp else None
+            # Optional: LLM-as-judge evaluation if user provides a reference answer
+            true_resp = input(
+                "If you have a reference/true answer for this question, "
+                "paste it here for LLM judge (or press Enter to skip):\n> "
+            ).strip()
 
-                result = rag_system.process_query(query, true_resp)
+            if true_resp:
+                judgment = rag_system.judge.evaluate(
+                    llm_response=result["response"],
+                    true_response=true_resp,
+                    query=query,
+                )
+                # Attach judgment and true answer to the stored result
+                result["true_response"] = true_resp
+                result["judgment"] = judgment
 
-                print("\n" + "RESULT")
-                print(f"{'—' * 80}")
-                print(f"Response: {result['response']}")
-                if result['judgment']:
-                    print(f"Judgment: {result['judgment']['judgment']}")
-                print(f"{'—' * 80}")
+                print(
+                    f"\nLLM Judge: {'CORRECT' if judgment['judgment'] else 'INCORRECT'} "
+                    f"(confidence: {judgment.get('confidence', 0):.2f})"
+                )
+                print(f"Explanation: {judgment.get('explanation', '')}")
 
-            elif choice == "4":
-                print("\nExiting...")
-                if rag_system.results_log:
-                    stats = rag_system.calculate_statistics(rag_system.results_log)
-                    rag_system.save_statistics(stats)
-                    rag_system.save_detailed_results(rag_system.results_log)
-                break
+    except KeyboardInterrupt:
+        print("\n\nInterrupted, exiting chat...")
 
-            else:
-                print("Invalid choice")
-
-        except KeyboardInterrupt:
-            print("\n\nExiting...")
-            break
-        except Exception as e:
-            print(f"Error: {e}")
+    # On exit, save statistics, detailed results and simple text accuracy summary
+    if rag_system.results_log:
+        stats = rag_system.calculate_statistics(rag_system.results_log)
+        rag_system.save_statistics(stats)
+        rag_system.save_detailed_results(rag_system.results_log)
+        rag_system.save_text_accuracy_summary(stats)
+        print("\nSession statistics, detailed results, and accuracy summary saved to the 'results' folder.")
+    else:
+        print("\nNo queries were processed. Nothing to save.")
 
 
 if __name__ == "__main__":
