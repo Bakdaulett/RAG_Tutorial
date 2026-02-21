@@ -1,11 +1,12 @@
 from typing import List
 import sys
 
-sys.path.append('/mnt/user-data/uploads')
+sys.path.append("uploads")
 
 from embedding_manager import Embedder
 from qdrant_manager import QdrantManager
 from pydantic_ai import Agent
+from reranker import QwenReranker
 
 
 class RAGGenerator:
@@ -22,7 +23,8 @@ class RAGGenerator:
             collection_name: str = "pdf_documents",
             embedding_model: str = "nomic-embed-text",
             top_k: int = 5,
-            score_threshold: float = 0.5
+            score_threshold: float = 0.5,
+            use_reranker: bool = True,
     ):
         """
         Initialize RAG Generator.
@@ -39,10 +41,12 @@ class RAGGenerator:
         self.collection_name = collection_name
         self.top_k = top_k
         self.score_threshold = score_threshold
+        self.use_reranker = use_reranker
 
-        # Initialize embedder and Qdrant manager
+        # Initialize embedder, Qdrant manager and reranker
         self.embedder = Embedder(model_name=embedding_model)
         self.qdrant_manager = QdrantManager()
+        self.reranker = QwenReranker()
 
         print(f"RAG Generator initialized with collection: {collection_name}")
 
@@ -94,13 +98,29 @@ class RAGGenerator:
             traceback.print_exc()
             results = []
 
-        # Step 3: Extract text contexts
-        contexts = [result['text'] for result in results]
+        # Optional: Rerank contexts using Ollama cross-encoder
+        if self.use_reranker and results:
+            print("\nReranking contexts with Qwen3-Reranker (Ollama)...")
+            results = self.reranker.rerank(query, results)
 
-        print(f"Retrieved {len(contexts)} contexts")
+        # Step 3: Extract text contexts after (re)ranking
+        contexts = [result["text"] for result in results]
+
+        print(f"Retrieved {len(contexts)} contexts (after reranking)")
         for i, result in enumerate(results, 1):
-            print(f"  Context {i}: score={result['score']:.3f}, "
-                  f"source={result['metadata'].get('source', 'unknown')}")
+            base_score = result.get("score", 0.0)
+            rerank_score = result.get("rerank_score")
+            if rerank_score is not None:
+                print(
+                    f"  Context {i}: qdrant_score={base_score:.3f}, "
+                    f"rerank_score={rerank_score:.3f}, "
+                    f"source={result['metadata'].get('source', 'unknown')}"
+                )
+            else:
+                print(
+                    f"  Context {i}: score={base_score:.3f}, "
+                    f"source={result['metadata'].get('source', 'unknown')}"
+                )
 
         return contexts
 

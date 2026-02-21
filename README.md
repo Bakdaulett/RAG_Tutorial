@@ -1,4 +1,4 @@
-# AI Sytem with RAG – Router Agent + RAG Generator + LLM Judge
+# AI-RAG-System – Router Agent + RAG Generator + LLM Judge
 
 A complete **Retrieval-Augmented Generation (RAG)** system implementation with intelligent routing, document retrieval, and automated evaluation.
 
@@ -88,7 +88,7 @@ Evaluation Results (Accuracy, Confidence, Explanation)
 1. **Clone the repository**:
    ```bash
    git clone <your-repo-url>
-   cd RAG_Tutorial
+   cd AI-RAG-System
    ```
 
 2. **Create virtual environment**:
@@ -318,7 +318,7 @@ Right answer: 29/47, accuracy: 62%
 ## Project Structure
 
 ```
-RAG_Tutorial/
+AI-RAG-System/
 ├── services/
 │   ├── main.py                 # Interactive chat with RAG system
 │   ├── evaluate_ollama.py      # Ollama-based evaluation (60 Q&A pairs)
