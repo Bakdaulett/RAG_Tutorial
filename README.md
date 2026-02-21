@@ -1,4 +1,4 @@
-# RAG Tutorial – Router Agent + RAG Generator + LLM Judge
+# AI Sytem with RAG – Router Agent + RAG Generator + LLM Judge
 
 A complete **Retrieval-Augmented Generation (RAG)** system implementation with intelligent routing, document retrieval, and automated evaluation.
 
